@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>prodkira — Image Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#000;--s1:#080808;--s2:#0e0e0e;--border:#1c1c1c;--border2:#2a2a2a;
+  --text:#fff;--muted:#555;--muted2:#888;--accent:#a855f7;--accent2:#7c3aed;
+  --panel:220px;--toolbar:48px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Raleway',sans-serif;}
+
+/* Layout */
+#app{display:flex;flex-direction:column;height:100vh;}
+#topbar{height:var(--toolbar);background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:10;}
+#main{display:flex;flex:1;overflow:hidden;}
+#left-panel{width:var(--panel);background:var(--s1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;}
+#canvas-area{flex:1;position:relative;overflow:hidden;background:#050505;background-image:repeating-conic-gradient(#0d0d0d 0% 25%,#050505 0% 50%);background-size:20px 20px;display:flex;align-items:center;justify-content:center;}
+#right-panel{width:var(--panel);background:var(--s1);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;}
+
+/* Topbar */
+.tb-logo{font-size:0.75rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted2);margin-right:8px;}
+.tb-sep{width:1px;height:20px;background:var(--border2);margin:0 4px;}
+.tb-btn{background:none;border:none;color:var(--muted2);cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;font-family:'Raleway',sans-serif;display:flex;align-items:center;gap:6px;transition:background 0.15s,color 0.15s;white-space:nowrap;}
+.tb-btn:hover{background:var(--s2);color:#fff;}
+.tb-btn i{font-size:0.8rem;}
+.tb-btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#fff;}
+.tb-btn.primary:hover{opacity:0.85;}
+.tb-spacer{flex:1;}
+#zoom-display{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);padding:0 8px;}
+
+/* Canvas */
+#canvas-wrap{position:relative;cursor:crosshair;}
+#main-canvas{display:block;max-width:100%;max-height:100%;}
+#overlay-canvas{position:absolute;top:0;left:0;pointer-events:none;}
+
+/* Drop zone */
+#drop-zone{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--muted);font-size:0.85rem;font-weight:300;letter-spacing:0.05em;cursor:pointer;}
+#drop-zone i{font-size:3rem;color:#1a1a1a;}
+#drop-zone.hidden{display:none;}
+
+/* Panel sections */
+.panel-section{padding:12px;border-bottom:1px solid var(--border);}
+.panel-title{font-size:0.65rem;font-weight:500;letter-spacing:0.25em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+/* Tools */
+.tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.tool-btn{background:none;border:1px solid transparent;border-radius:8px;color:var(--muted2);cursor:pointer;padding:8px 6px;font-size:0.7rem;font-family:'Raleway',sans-serif;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all 0.15s;}
+.tool-btn i{font-size:1rem;}
+.tool-btn:hover{background:var(--s2);color:#fff;border-color:var(--border2);}
+.tool-btn.active{background:#0a0010;border-color:var(--accent2);color:var(--accent);}
+
+/* Sliders */
+.slider-row{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+.slider-label{display:flex;justify-content:space-between;font-size:0.72rem;color:var(--muted2);}
+.slider-label span{font-family:'DM Mono',monospace;color:var(--muted);}
+input[type=range]{-webkit-appearance:none;width:100%;height:2px;background:#1a1a1a;border-radius:99px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer;}
+
+/* Color picker */
+.color-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.color-swatch{width:28px;height:28px;border-radius:6px;border:1px solid var(--border2);cursor:pointer;flex-shrink:0;}
+input[type=color]{opacity:0;position:absolute;pointer-events:none;}
+
+/* Toggles */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:0.75rem;color:var(--muted2);}
+.toggle{width:32px;height:18px;background:#1a1a1a;border-radius:99px;cursor:pointer;position:relative;transition:background 0.2s;border:none;}
+.toggle.on{background:var(--accent2);}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left 0.2s;}
+.toggle.on::after{left:17px;}
+
+/* Layers */
+.layer-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:0.75rem;color:var(--muted2);border:1px solid transparent;transition:all 0.15s;}
+.layer-item:hover{background:var(--s2);}
+.layer-item.active{background:#0a0010;border-color:#2a1040;color:#fff;}
+.layer-thumb{width:28px;height:28px;border-radius:4px;background:#111;border:1px solid var(--border);object-fit:cover;flex-shrink:0;}
+.layer-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.layer-btns{display:flex;gap:2px;}
+.layer-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:3px;font-size:0.7rem;border-radius:4px;transition:color 0.15s;}
+.layer-btn:hover{color:#fff;}
+
+/* Histogram */
+#histogram-canvas{width:100%;height:60px;border-radius:6px;background:#050505;}
+
+/* Presets */
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.preset-btn{background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--muted2);cursor:pointer;padding:8px 6px;font-size:0.68rem;font-family:'Raleway',sans-serif;text-align:center;transition:all 0.15s;letter-spacing:0.03em;}
+.preset-btn:hover{border-color:var(--accent2);color:#fff;}
+
+/* Text overlay */
+#text-input-wrap{display:none;position:absolute;z-index:20;}
+#text-input{background:transparent;border:1px dashed var(--accent);color:#fff;font-size:20px;outline:none;min-width:80px;padding:2px 4px;}
+
+/* Status bar */
+#statusbar{height:22px;background:var(--s1);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:16px;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);flex-shrink:0;}
+#statusbar span{color:var(--muted2);}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#1a1a1a;border-radius:99px;}
+
+/* Select */
+select{background:var(--s2);border:1px solid var(--border2);color:var(--muted2);font-family:'Raleway',sans-serif;font-size:0.75rem;padding:5px 8px;border-radius:6px;outline:none;width:100%;cursor:pointer;}
+select:focus{border-color:var(--accent2);}
+
+/* Section collapse */
+.section-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;}
+.section-head i{font-size:0.6rem;color:var(--muted);transition:transform 0.2s;}
+.section-head.collapsed i{transform:rotate(-90deg);}
+.section-body{overflow:hidden;}
+
+/* Btn small */
+.mini-btn{background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--muted2);cursor:pointer;padding:5px 10px;font-size:0.72rem;font-family:'Raleway',sans-serif;transition:all 0.15s;}
+.mini-btn:hover{border-color:var(--accent2);color:#fff;}
+.mini-btn-row{display:flex;gap:6px;flex-wrap:wrap;}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- Topbar -->
+<div id="topbar">
+  <span class="tb-logo">img</span>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="document.getElementById('file-open').click()"><i class="fa-solid fa-folder-open"></i> Open</button>
+  <input type="file" id="file-open" accept="image/*" style="display:none">
+  <button class="tb-btn" id="btn-undo"><i class="fa-solid fa-rotate-left"></i> Undo</button>
+  <button class="tb-btn" id="btn-redo"><i class="fa-solid fa-rotate-right"></i> Redo</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-crop-apply" style="display:none"><i class="fa-solid fa-check"></i> Apply Crop</button>
+  <button class="tb-btn" id="btn-crop-cancel" style="display:none"><i class="fa-solid fa-xmark"></i> Cancel</button>
+  <div class="tb-spacer"></div>
+  <span id="zoom-display">100%</span>
+  <button class="tb-btn" id="btn-zoom-out"><i class="fa-solid fa-minus"></i></button>
+  <button class="tb-btn" id="btn-zoom-fit"><i class="fa-solid fa-expand"></i></button>
+  <button class="tb-btn" id="btn-zoom-in"><i class="fa-solid fa-plus"></i></button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn primary" id="btn-export"><i class="fa-solid fa-download"></i> Export</button>
+</div>
+
+<div id="main">
+
+<!-- Left Panel: Tools + Adjustments -->
+<div id="left-panel">
+
+  <!-- Tools -->
+  <div class="panel-section">
+    <div class="panel-title">Tools</div>
+    <div class="tool-grid">
+      <button class="tool-btn active" data-tool="select"><i class="fa-solid fa-arrow-pointer"></i>Select</button>
+      <button class="tool-btn" data-tool="crop"><i class="fa-solid fa-crop-simple"></i>Crop</button>
+      <button class="tool-btn" data-tool="brush"><i class="fa-solid fa-paintbrush"></i>Brush</button>
+      <button class="tool-btn" data-tool="eraser"><i class="fa-solid fa-eraser"></i>Eraser</button>
+      <button class="tool-btn" data-tool="eyedropper"><i class="fa-solid fa-eye-dropper"></i>Picker</button>
+      <button class="tool-btn" data-tool="fill"><i class="fa-solid fa-fill-drip"></i>Fill</button>
+      <button class="tool-btn" data-tool="text"><i class="fa-solid fa-font"></i>Text</button>
+      <button class="tool-btn" data-tool="shape"><i class="fa-solid fa-shapes"></i>Shape</button>
+      <button class="tool-btn" data-tool="blur"><i class="fa-solid fa-droplet"></i>Blur</button>
+      <button class="tool-btn" data-tool="sharpen"><i class="fa-solid fa-wand-sparkles"></i>Sharpen</button>
+      <button class="tool-btn" data-tool="smudge"><i class="fa-solid fa-hand"></i>Smudge</button>
+      <button class="tool-btn" data-tool="clone"><i class="fa-solid fa-clone"></i>Clone</button>
+    </div>
+  </div>
+
+  <!-- Brush Options -->
+  <div class="panel-section" id="brush-options">
+    <div class="panel-title">Brush</div>
+    <div class="slider-row">
+      <div class="slider-label">Size<span id="brush-size-val">20px</span></div>
+      <input type="range" id="brush-size" min="1" max="200" value="20">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Opacity<span id="brush-opacity-val">100%</span></div>
+      <input type="range" id="brush-opacity" min="1" max="100" value="100">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Hardness<span id="brush-hardness-val">80%</span></div>
+      <input type="range" id="brush-hardness" min="0" max="100" value="80">
+    </div>
+    <div class="color-row">
+      <div class="color-swatch" id="fg-swatch" style="background:#ffffff"></div>
+      <span style="font-size:0.72rem;color:var(--muted2)">Foreground</span>
+      <input type="color" id="fg-color" value="#ffffff">
+    </div>
+    <div style="margin-bottom:8px">
+      <div class="panel-title" style="margin-bottom:6px">Blend Mode</div>
+      <select id="blend-mode">
+        <option value="source-over">Normal</option>
+        <option value="multiply">Multiply</option>
+        <option value="screen">Screen</option>
+        <option value="overlay">Overlay</option>
+        <option value="darken">Darken</option>
+        <option value="lighten">Lighten</option>
+        <option value="color-dodge">Color Dodge</option>
+        <option value="color-burn">Color Burn</option>
+        <option value="hard-light">Hard Light</option>
+        <option value="soft-light">Soft Light</option>
+        <option value="difference">Difference</option>
+        <option value="exclusion">Exclusion</option>
+        <option value="hue">Hue</option>
+        <option value="saturation">Saturation</option>
+        <option value="color">Color</option>
+        <option value="luminosity">Luminosity</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Shape Options -->
+  <div class="panel-section" id="shape-options" style="display:none">
+    <div class="panel-title">Shape</div>
+    <select id="shape-type" style="margin-bottom:8px">
+      <option value="rect">Rectangle</option>
+      <option value="ellipse">Ellipse</option>
+      <option value="line">Line</option>
+      <option value="arrow">Arrow</option>
+      <option value="triangle">Triangle</option>
+      <option value="star">Star</option>
+    </select>
+    <div class="toggle-row">Fill<button class="toggle on" id="shape-fill-toggle"></button></div>
+    <div class="toggle-row">Stroke<button class="toggle on" id="shape-stroke-toggle"></button></div>
+    <div class="slider-row">
+      <div class="slider-label">Stroke Width<span id="stroke-width-val">2px</span></div>
+      <input type="range" id="stroke-width" min="1" max="20" value="2">
+    </div>
+  </div>
+
+  <!-- Text Options -->
+  <div class="panel-section" id="text-options" style="display:none">
+    <div class="panel-title">Text</div>
+    <select id="text-font" style="margin-bottom:8px">
+      <option>Raleway</option><option>Georgia</option><option>Courier New</option>
+      <option>Impact</option><option>Arial Black</option><option>Palatino</option>
+    </select>
+    <div class="slider-row">
+      <div class="slider-label">Size<span id="text-size-val">24px</span></div>
+      <input type="range" id="text-size" min="8" max="200" value="24">
+    </div>
+    <div class="toggle-row">Bold<button class="toggle" id="text-bold-toggle"></button></div>
+    <div class="toggle-row">Italic<button class="toggle" id="text-italic-toggle"></button></div>
+    <div class="color-row">
+      <div class="color-swatch" id="text-color-swatch" style="background:#ffffff"></div>
+      <span style="font-size:0.72rem;color:var(--muted2)">Color</span>
+      <input type="color" id="text-color" value="#ffffff">
+    </div>
+  </div>
+
+  <!-- Transform -->
+  <div class="panel-section">
+    <div class="section-head" onclick="toggleSection(this)">
+      <div class="panel-title" style="margin:0">Transform</div>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="section-body" style="margin-top:10px">
+      <div class="mini-btn-row" style="margin-bottom:8px">
+        <button class="mini-btn" onclick="rotateImage(-90)"><i class="fa-solid fa-rotate-left"></i> -90°</button>
+        <button class="mini-btn" onclick="rotateImage(90)"><i class="fa-solid fa-rotate-right"></i> +90°</button>
+        <button class="mini-btn" onclick="rotateImage(180)">180°</button>
+      </div>
+      <div class="mini-btn-row" style="margin-bottom:8px">
+        <button class="mini-btn" onclick="flipImage('h')"><i class="fa-solid fa-left-right"></i> Flip H</button>
+        <button class="mini-btn" onclick="flipImage('v')"><i class="fa-solid fa-up-down"></i> Flip V</button>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">Rotation<span id="rotation-val">0°</span></div>
+        <input type="range" id="rotation" min="-180" max="180" value="0">
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Canvas -->
+<div id="canvas-area">
+  <div id="drop-zone">
+    <i class="fa-solid fa-image"></i>
+    <div>Drop an image or click Open</div>
+    <div style="font-size:0.72rem;color:#333">jpg · png · gif · webp · bmp · svg</div>
+  </div>
+  <div id="canvas-wrap" style="display:none;position:relative;">
+    <canvas id="main-canvas"></canvas>
+    <canvas id="overlay-canvas"></canvas>
+  </div>
+  <div id="text-input-wrap">
+    <input type="text" id="text-input" placeholder="Type here...">
+  </div>
+</div>
+
+<!-- Right Panel: Adjustments + Layers -->
+<div id="right-panel">
+
+  <!-- Adjustments -->
+  <div class="panel-section">
+    <div class="panel-title">Adjustments</div>
+
+    <div class="slider-row">
+      <div class="slider-label">Brightness<span id="brightness-val">0</span></div>
+      <input type="range" id="brightness" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Contrast<span id="contrast-val">0</span></div>
+      <input type="range" id="contrast" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Saturation<span id="saturation-val">0</span></div>
+      <input type="range" id="saturation" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Hue<span id="hue-val">0°</span></div>
+      <input type="range" id="hue" min="-180" max="180" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Exposure<span id="exposure-val">0</span></div>
+      <input type="range" id="exposure" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Highlights<span id="highlights-val">0</span></div>
+      <input type="range" id="highlights" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Shadows<span id="shadows-val">0</span></div>
+      <input type="range" id="shadows" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Whites<span id="whites-val">0</span></div>
+      <input type="range" id="whites" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Blacks<span id="blacks-val">0</span></div>
+      <input type="range" id="blacks" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Sharpness<span id="sharpness-val">0</span></div>
+      <input type="range" id="sharpness" min="0" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Blur<span id="blur-val">0</span></div>
+      <input type="range" id="blur-adj" min="0" max="20" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Noise<span id="noise-val">0</span></div>
+      <input type="range" id="noise" min="0" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Vignette<span id="vignette-val">0</span></div>
+      <input type="range" id="vignette" min="0" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Temperature<span id="temperature-val">0</span></div>
+      <input type="range" id="temperature" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Tint<span id="tint-val">0</span></div>
+      <input type="range" id="tint" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Clarity<span id="clarity-val">0</span></div>
+      <input type="range" id="clarity" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Vibrance<span id="vibrance-val">0</span></div>
+      <input type="range" id="vibrance" min="-100" max="100" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">Fade<span id="fade-val">0</span></div>
+      <input type="range" id="fade" min="0" max="100" value="0">
+    </div>
+  </div>
+
+  <!-- Curves placeholder -->
+  <div class="panel-section">
+    <div class="panel-title">Tone Curve</div>
+    <canvas id="curve-canvas" width="196" height="100" style="width:100%;border-radius:6px;background:#050505;cursor:crosshair;border:1px solid var(--border);"></canvas>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="mini-btn" onclick="resetCurve()" style="flex:1">Reset</button>
+      <select id="curve-channel" style="flex:1">
+        <option value="rgb">RGB</option>
+        <option value="r">Red</option>
+        <option value="g">Green</option>
+        <option value="b">Blue</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="panel-section">
+    <div class="panel-title">Filters</div>
+    <div class="preset-grid">
+      <button class="preset-btn" onclick="applyPreset('none')">Original</button>
+      <button class="preset-btn" onclick="applyPreset('bw')">B&W</button>
+      <button class="preset-btn" onclick="applyPreset('sepia')">Sepia</button>
+      <button class="preset-btn" onclick="applyPreset('vivid')">Vivid</button>
+      <button class="preset-btn" onclick="applyPreset('cool')">Cool</button>
+      <button class="preset-btn" onclick="applyPreset('warm')">Warm</button>
+      <button class="preset-btn" onclick="applyPreset('fade')">Faded</button>
+      <button class="preset-btn" onclick="applyPreset('chrome')">Chrome</button>
+      <button class="preset-btn" onclick="applyPreset('noir')">Noir</button>
+      <button class="preset-btn" onclick="applyPreset('matte')">Matte</button>
+      <button class="preset-btn" onclick="applyPreset('vintage')">Vintage</button>
+      <button class="preset-btn" onclick="applyPreset('dramatic')">Dramatic</button>
+    </div>
+  </div>
+
+  <!-- Histogram -->
+  <div class="panel-section">
+    <div class="panel-title">Histogram</div>
+    <canvas id="histogram-canvas"></canvas>
+  </div>
+
+  <!-- Layers -->
+  <div class="panel-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="panel-title" style="margin:0">Layers</div>
+      <div style="display:flex;gap:4px">
+        <button class="layer-btn" onclick="addLayer()" title="Add Layer"><i class="fa-solid fa-plus"></i></button>
+        <button class="layer-btn" onclick="deleteLayer()" title="Delete Layer"><i class="fa-solid fa-trash"></i></button>
+        <button class="layer-btn" onclick="mergeDown()" title="Merge Down"><i class="fa-solid fa-layer-group"></i></button>
+      </div>
+    </div>
+    <div id="layers-list"></div>
+    <div class="slider-row" style="margin-top:8px">
+      <div class="slider-label">Layer Opacity<span id="layer-opacity-val">100%</span></div>
+      <input type="range" id="layer-opacity" min="0" max="100" value="100">
+    </div>
+    <select id="layer-blend" style="margin-top:4px">
+      <option value="source-over">Normal</option>
+      <option value="multiply">Multiply</option>
+      <option value="screen">Screen</option>
+      <option value="overlay">Overlay</option>
+      <option value="darken">Darken</option>
+      <option value="lighten">Lighten</option>
+    </select>
+  </div>
+
+  <!-- Resize -->
+  <div class="panel-section">
+    <div class="panel-title">Resize Canvas</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <div style="flex:1">
+        <div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px">Width</div>
+        <input type="number" id="resize-w" style="width:100%;background:var(--s2);border:1px solid var(--border2);color:#fff;padding:5px;border-radius:6px;font-family:'DM Mono',monospace;font-size:0.75rem;outline:none;">
+      </div>
+      <div style="flex:1">
+        <div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px">Height</div>
+        <input type="number" id="resize-h" style="width:100%;background:var(--s2);border:1px solid var(--border2);color:#fff;padding:5px;border-radius:6px;font-family:'DM Mono',monospace;font-size:0.75rem;outline:none;">
+      </div>
+    </div>
+    <div class="toggle-row" style="margin-bottom:8px">Lock Aspect<button class="toggle on" id="aspect-toggle"></button></div>
+    <button class="mini-btn" style="width:100%" onclick="resizeCanvas()">Apply Resize</button>
+  </div>
+
+  <!-- Export Options -->
+  <div class="panel-section">
+    <div class="panel-title">Export</div>
+    <select id="export-format" style="margin-bottom:8px">
+      <option value="png">PNG</option>
+      <option value="jpeg">JPEG</option>
+      <option value="webp">WebP</option>
+    </select>
+    <div class="slider-row">
+      <div class="slider-label">Quality<span id="quality-val">92%</span></div>
+      <input type="range" id="export-quality" min="1" max="100" value="92">
+    </div>
+    <button class="mini-btn" style="width:100%" onclick="exportImage()">Download</button>
+  </div>
+
+</div>
+</div><!-- /main -->
+
+<!-- Statusbar -->
+<div id="statusbar">
+  <span id="status-size">—</span>
+  <span id="status-pos">x:— y:—</span>
+  <span id="status-color">rgb(—)</span>
+  <div style="flex:1"></div>
+  <span id="status-tool">select</span>
+</div>
+</div><!-- /app -->
+
+<script>
+// ============================================================
+// State
+// ============================================================
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay-canvas');
+const octx = overlay.getContext('2d');
+
+let imageLoaded = false;
+let zoom = 1;
+let tool = 'select';
+let drawing = false;
+let lastX = 0, lastY = 0;
+let undoStack = [], redoStack = [];
+let cropStart = null, cropRect = null;
+let shapeStart = null;
+let cloneSource = null;
+let smudgeData = null;
+
+// Adjustments state
+const adj = {
+  brightness:0,contrast:0,saturation:0,hue:0,exposure:0,
+  highlights:0,shadows:0,whites:0,blacks:0,sharpness:0,
+  blur:0,noise:0,vignette:0,temperature:0,tint:0,clarity:0,vibrance:0,fade:0
+};
+
+// Layers
+let layers = [];
+let activeLayer = 0;
+
+// Tone curve
+let curvePoints = [{x:0,y:0},{x:255,y:255}];
+let draggingCurvePoint = -1;
+
+// ============================================================
+// Init
+// ============================================================
+function initLayer(name='Layer 1') {
+  const lc = document.createElement('canvas');
+  lc.width = canvas.width;
+  lc.height = canvas.height;
+  return {canvas:lc, ctx:lc.getContext('2d'), name, opacity:1, blend:'source-over', visible:true};
+}
+
+function loadImage(src) {
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    overlay.width = img.width;
+    overlay.height = img.height;
+
+    layers = [initLayer('Background')];
+    layers[0].ctx.drawImage(img, 0, 0);
+    activeLayer = 0;
+
+    imageLoaded = true;
+    document.getElementById('drop-zone').classList.add('hidden');
+    document.getElementById('canvas-wrap').style.display = 'block';
+
+    document.getElementById('resize-w').value = img.width;
+    document.getElementById('resize-h').value = img.height;
+    document.getElementById('status-size').textContent = `${img.width}×${img.height}`;
+
+    resetAllAdj();
+    renderLayers();
+    renderLayersList();
+    updateHistogram();
+    pushUndo();
+    fitZoom();
+  };
+  img.src = src;
+}
+
+// ============================================================
+// File open / drop
+// ============================================================
+document.getElementById('file-open').addEventListener('change', e => {
+  if (e.target.files[0]) loadImage(URL.createObjectURL(e.target.files[0]));
+});
+document.getElementById('drop-zone').addEventListener('click', () => document.getElementById('file-open').click());
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadImage(URL.createObjectURL(f));
+});
+
+// ============================================================
+// Render
+// ============================================================
+function renderLayers() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  layers.forEach(l => {
+    if (!l.visible) return;
+    ctx.save();
+    ctx.globalAlpha = l.opacity;
+    ctx.globalCompositeOperation = l.blend;
+    ctx.drawImage(l.canvas, 0, 0);
+    ctx.restore();
+  });
+  applyAdjustments();
+}
+
+// ============================================================
+// Adjustments (pixel manipulation)
+// ============================================================
+function resetAllAdj() {
+  Object.keys(adj).forEach(k => adj[k] = 0);
+  document.querySelectorAll('#right-panel input[type=range]').forEach(el => {
+    if (el.id !== 'layer-opacity' && el.id !== 'export-quality') el.value = 0;
+  });
+  document.getElementById('blur-adj').value = 0;
+  document.getElementById('sharpness').value = 0;
+  updateAllSliderLabels();
+}
+
+function clamp(v,mn,mx){return Math.max(mn,Math.min(mx,v));}
+function lerp(a,b,t){return a+(b-a)*t;}
+
+function applyAdjustments() {
+  if (!imageLoaded) return;
+  const w = canvas.width, h = canvas.height;
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const d = imageData.data;
+
+  const bright = adj.brightness / 100;
+  const cont = adj.contrast / 100;
+  const sat = adj.saturation / 100;
+  const hueShift = adj.hue;
+  const expo = adj.exposure / 100;
+  const high = adj.highlights / 100;
+  const shad = adj.shadows / 100;
+  const wht = adj.whites / 100;
+  const blk = adj.blacks / 100;
+  const temp = adj.temperature / 100;
+  const tintV = adj.tint / 100;
+  const clarity = adj.clarity / 200;
+  const vibrance = adj.vibrance / 100;
+  const fade = adj.fade / 100;
+
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i]/255, g = d[i+1]/255, b = d[i+2]/255;
+
+    // Temperature
+    r += temp * 0.15; b -= temp * 0.15;
+    // Tint
+    g += tintV * 0.1; r -= tintV * 0.05;
+
+    // Exposure
+    r = r * Math.pow(2, expo * 3);
+    g = g * Math.pow(2, expo * 3);
+    b = b * Math.pow(2, expo * 3);
+
+    // Brightness
+    r += bright; g += bright; b += bright;
+
+    // Contrast
+    const factor = (259 * (cont * 255 + 255)) / (255 * (259 - cont * 255));
+    r = factor * (r - 0.5) + 0.5;
+    g = factor * (g - 0.5) + 0.5;
+    b = factor * (b - 0.5) + 0.5;
+
+    // Highlights / Shadows / Whites / Blacks
+    const lum = 0.299*r + 0.587*g + 0.114*b;
+    if (lum > 0.5) { r += high * (lum - 0.5); g += high * (lum - 0.5); b += high * (lum - 0.5); }
+    else { r += shad * (0.5 - lum); g += shad * (0.5 - lum); b += shad * (0.5 - lum); }
+    if (lum > 0.85) { r += wht * (lum - 0.85); g += wht * (lum - 0.85); b += wht * (lum - 0.85); }
+    if (lum < 0.15) { r -= blk * (0.15 - lum); g -= blk * (0.15 - lum); b -= blk * (0.15 - lum); }
+
+    // Fade
+    r = lerp(r, 0.5, fade * 0.5);
+    g = lerp(g, 0.5, fade * 0.5);
+    b = lerp(b, 0.5, fade * 0.5);
+
+    // Saturation + Vibrance
+    const gray = 0.299*r + 0.587*g + 0.114*b;
+    const maxc = Math.max(r,g,b);
+    const satV = sat + vibrance * (1 - (maxc - gray));
+    r = gray + (r - gray) * (1 + satV);
+    g = gray + (g - gray) * (1 + satV);
+    b = gray + (b - gray) * (1 + satV);
+
+    // Hue shift
+    if (hueShift !== 0) {
+      const [hh, ss, ll] = rgbToHsl(r, g, b);
+      [r, g, b] = hslToRgb((hh + hueShift/360 + 1) % 1, ss, ll);
+    }
+
+    // Tone curve
+    r = applyCurve(r);
+    g = applyCurve(g);
+    b = applyCurve(b);
+
+    d[i]   = clamp(r * 255, 0, 255);
+    d[i+1] = clamp(g * 255, 0, 255);
+    d[i+2] = clamp(b * 255, 0, 255);
+  }
+
+  // Noise
+  if (adj.noise > 0) {
+    for (let i = 0; i < d.length; i += 4) {
+      const n = (Math.random() - 0.5) * adj.noise * 2;
+      d[i] = clamp(d[i]+n,0,255);
+      d[i+1] = clamp(d[i+1]+n,0,255);
+      d[i+2] = clamp(d[i+2]+n,0,255);
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  // Vignette
+  if (adj.vignette > 0) {
+    const vg = ctx.createRadialGradient(w/2,h/2,Math.min(w,h)*0.3,w/2,h/2,Math.max(w,h)*0.8);
+    vg.addColorStop(0,'rgba(0,0,0,0)');
+    vg.addColorStop(1,`rgba(0,0,0,${adj.vignette/120})`);
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = vg;
+    ctx.fillRect(0,0,w,h);
+    ctx.restore();
+  }
+
+  updateHistogram();
+}
+
+// ============================================================
+// Tone Curve
+// ============================================================
+const curveCanvas = document.getElementById('curve-canvas');
+const cctx = curveCanvas.getContext('2d');
+drawCurve();
+
+function drawCurve() {
+  const w = curveCanvas.width, h = curveCanvas.height;
+  cctx.clearRect(0,0,w,h);
+  // Grid
+  cctx.strokeStyle='#1a1a1a';cctx.lineWidth=1;
+  for(let i=1;i<4;i++){cctx.beginPath();cctx.moveTo(i*w/4,0);cctx.lineTo(i*w/4,h);cctx.stroke();}
+  for(let i=1;i<4;i++){cctx.beginPath();cctx.moveTo(0,i*h/4);cctx.lineTo(w,i*h/4);cctx.stroke();}
+  // Diagonal guide
+  cctx.strokeStyle='#2a2a2a';cctx.beginPath();cctx.moveTo(0,h);cctx.lineTo(w,0);cctx.stroke();
+  // Curve
+  const sorted = [...curvePoints].sort((a,b)=>a.x-b.x);
+  cctx.strokeStyle='#a855f7';cctx.lineWidth=2;cctx.beginPath();
+  sorted.forEach((p,i)=>{
+    const px = p.x/255*w, py = h - p.y/255*h;
+    i===0 ? cctx.moveTo(px,py) : cctx.lineTo(px,py);
+  });
+  cctx.stroke();
+  // Points
+  sorted.forEach(p=>{
+    cctx.beginPath();
+    cctx.arc(p.x/255*w, h-p.y/255*h, 4, 0, Math.PI*2);
+    cctx.fillStyle='#fff';cctx.fill();
+  });
+}
+
+function applyCurve(v) {
+  const sorted = [...curvePoints].sort((a,b)=>a.x-b.x);
+  const x = v * 255;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (x >= sorted[i].x && x <= sorted[i+1].x) {
+      const t = (x - sorted[i].x) / (sorted[i+1].x - sorted[i].x);
+      return lerp(sorted[i].y, sorted[i+1].y, t) / 255;
+    }
+  }
+  return v;
+}
+
+function resetCurve() { curvePoints = [{x:0,y:0},{x:255,y:255}]; drawCurve(); renderLayers(); }
+
+curveCanvas.addEventListener('mousedown', e => {
+  const r = curveCanvas.getBoundingClientRect();
+  const x = (e.clientX-r.left)/r.width*255;
+  const y = 255-(e.clientY-r.top)/r.height*255;
+  // Check existing
+  draggingCurvePoint = curvePoints.findIndex(p=>Math.hypot(p.x-x,p.y-y)<15);
+  if (draggingCurvePoint === -1) { curvePoints.push({x,y}); draggingCurvePoint = curvePoints.length-1; }
+  drawCurve();
+});
+curveCanvas.addEventListener('mousemove', e => {
+  if (draggingCurvePoint === -1) return;
+  const r = curveCanvas.getBoundingClientRect();
+  curvePoints[draggingCurvePoint].x = clamp((e.clientX-r.left)/r.width*255,0,255);
+  curvePoints[draggingCurvePoint].y = clamp(255-(e.clientY-r.top)/r.height*255,0,255);
+  drawCurve(); renderLayers();
+});
+curveCanvas.addEventListener('mouseup', () => { draggingCurvePoint = -1; });
+
+// ============================================================
+// Histogram
+// ============================================================
+function updateHistogram() {
+  const hc = document.getElementById('histogram-canvas');
+  hc.width = hc.offsetWidth * window.devicePixelRatio || 196;
+  hc.height = 60;
+  const hctx = hc.getContext('2d');
+  if (!imageLoaded) return;
+  const id = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  const rBins=new Array(256).fill(0), gBins=new Array(256).fill(0), bBins=new Array(256).fill(0);
+  for(let i=0;i<id.length;i+=4){rBins[id[i]]++;gBins[id[i+1]]++;bBins[id[i+2]]++;}
+  const maxV = Math.max(...rBins,...gBins,...bBins);
+  hctx.clearRect(0,0,hc.width,hc.height);
+  [[rBins,'rgba(255,80,80,0.5)'],[gBins,'rgba(80,220,80,0.5)'],[bBins,'rgba(80,120,255,0.5)']].forEach(([bins,color])=>{
+    hctx.fillStyle=color;
+    bins.forEach((v,i)=>{
+      const bh = (v/maxV)*hc.height;
+      hctx.fillRect(i/256*hc.width, hc.height-bh, hc.width/256+1, bh);
+    });
+  });
+}
+
+// ============================================================
+// Tools
+// ============================================================
+document.querySelectorAll('.tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    tool = btn.dataset.tool;
+    document.getElementById('status-tool').textContent = tool;
+    document.getElementById('brush-options').style.display = ['brush','eraser','blur','sharpen','smudge','clone'].includes(tool)?'block':'none';
+    document.getElementById('shape-options').style.display = tool==='shape'?'block':'none';
+    document.getElementById('text-options').style.display = tool==='text'?'block':'none';
+    octx.clearRect(0,0,overlay.width,overlay.height);
+    if (tool==='crop') showCropUI();
+    else { hideCropUI(); }
+    canvas.style.cursor = {
+      select:'default',crop:'crosshair',brush:'crosshair',eraser:'cell',
+      eyedropper:'crosshair',fill:'crosshair',text:'text',shape:'crosshair',
+      blur:'crosshair',sharpen:'crosshair',smudge:'crosshair',clone:'crosshair'
+    }[tool]||'default';
+  });
+});
+
+// ============================================================
+// Canvas mouse events
+// ============================================================
+overlay.style.pointerEvents='auto';
+
+overlay.addEventListener('mousedown', e => {
+  if (!imageLoaded) return;
+  const [x,y] = getCanvasPos(e);
+  drawing = true; lastX=x; lastY=y;
+
+  if (tool==='eyedropper') { pickColor(x,y); return; }
+  if (tool==='fill') { floodFill(x,y); return; }
+  if (tool==='text') { placeText(x,y); return; }
+  if (tool==='clone' && e.altKey) { cloneSource={x,y}; return; }
+  if (tool==='crop') { cropStart={x,y}; return; }
+  if (tool==='shape') { shapeStart={x,y}; return; }
+  pushUndo();
+});
+
+overlay.addEventListener('mousemove', e => {
+  const [x,y] = getCanvasPos(e);
+  document.getElementById('status-pos').textContent = `x:${Math.round(x)} y:${Math.round(y)}`;
+
+  if (!drawing) return;
+  if (tool==='brush') paintBrush(x,y,false);
+  else if (tool==='eraser') paintBrush(x,y,true);
+  else if (tool==='blur') paintBlur(x,y);
+  else if (tool==='sharpen') paintSharpen(x,y);
+  else if (tool==='smudge') paintSmudge(x,y);
+  else if (tool==='clone' && cloneSource) paintClone(x,y);
+  else if (tool==='crop') drawCropOverlay(x,y);
+  else if (tool==='shape') drawShapeOverlay(x,y);
+  lastX=x; lastY=y;
+});
+
+overlay.addEventListener('mouseup', e => {
+  const [x,y] = getCanvasPos(e);
+  if (tool==='shape' && shapeStart) { commitShape(x,y); shapeStart=null; }
+  if (tool==='crop' && cropStart) { cropRect={x1:cropStart.x,y1:cropStart.y,x2:x,y2:y}; cropStart=null; }
+  drawing=false;
+});
+
+function getCanvasPos(e) {
+  const r = overlay.getBoundingClientRect();
+  return [(e.clientX-r.left)/zoom, (e.clientY-r.top)/zoom];
+}
+
+// ============================================================
+// Brush
+// ============================================================
+function paintBrush(x,y,erase) {
+  const lc = layers[activeLayer];
+  const lctx = lc.ctx;
+  const size = +document.getElementById('brush-size').value;
+  const opac = +document.getElementById('brush-opacity').value/100;
+  const hard = +document.getElementById('brush-hardness').value/100;
+  const color = document.getElementById('fg-color').value;
+  const blend = document.getElementById('blend-mode').value;
+
+  lctx.save();
+  lctx.globalAlpha = opac;
+  lctx.globalCompositeOperation = erase ? 'destination-out' : blend;
+  lctx.strokeStyle = color;
+  lctx.lineWidth = size;
+  lctx.lineCap = 'round';
+  lctx.lineJoin = 'round';
+
+  if (hard < 0.9) {
+    const grad = lctx.createRadialGradient(x,y,0,x,y,size/2);
+    grad.addColorStop(0, color);
+    grad.addColorStop(hard, color);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    lctx.fillStyle = grad;
+    lctx.beginPath();
+    lctx.arc(x,y,size/2,0,Math.PI*2);
+    lctx.fill();
+  } else {
+    lctx.beginPath();
+    lctx.moveTo(lastX,lastY);
+    lctx.lineTo(x,y);
+    lctx.stroke();
+  }
+  lctx.restore();
+  renderLayers();
+}
+
+// ============================================================
+// Blur brush
+// ============================================================
+function paintBlur(x,y) {
+  const size = +document.getElementById('brush-size').value;
+  const lc = layers[activeLayer];
+  const lctx = lc.ctx;
+  const region = lctx.getImageData(x-size/2, y-size/2, size, size);
+  const blurred = gaussianBlur(region, 2);
+  lctx.putImageData(blurred, x-size/2, y-size/2);
+  renderLayers();
+}
+
+function paintSharpen(x,y) {
+  const size = +document.getElementById('brush-size').value;
+  const lc = layers[activeLayer];
+  const lctx = lc.ctx;
+  const region = lctx.getImageData(x-size/2, y-size/2, size, size);
+  const sharpened = sharpenImageData(region);
+  lctx.putImageData(sharpened, x-size/2, y-size/2);
+  renderLayers();
+}
+
+function gaussianBlur(id, radius) {
+  // Simple box blur approximation
+  const d = new Uint8ClampedArray(id.data);
+  const w = id.width, h = id.height;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let r=0,g=0,b=0,a=0,cnt=0;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const nx=x+dx, ny=y+dy;
+          if (nx>=0&&nx<w&&ny>=0&&ny<h) {
+            const i=(ny*w+nx)*4;
+            r+=id.data[i];g+=id.data[i+1];b+=id.data[i+2];a+=id.data[i+3];cnt++;
+          }
+        }
+      }
+      const i=(y*w+x)*4;
+      d[i]=r/cnt;d[i+1]=g/cnt;d[i+2]=b/cnt;d[i+3]=a/cnt;
+    }
+  }
+  return new ImageData(d,w,h);
+}
+
+function sharpenImageData(id) {
+  const kernel = [0,-1,0,-1,5,-1,0,-1,0];
+  const d = new Uint8ClampedArray(id.data);
+  const w = id.width, h = id.height;
+  for (let y=1;y<h-1;y++) {
+    for (let x=1;x<w-1;x++) {
+      for (let c=0;c<3;c++) {
+        let v=0;
+        for (let ky=-1;ky<=1;ky++) for (let kx=-1;kx<=1;kx++)
+          v+=id.data[((y+ky)*w+(x+kx))*4+c]*kernel[(ky+1)*3+(kx+1)];
+        d[(y*w+x)*4+c]=clamp(v,0,255);
+      }
+    }
+  }
+  return new ImageData(d,w,h);
+}
+
+function paintSmudge(x,y) {
+  const size = +document.getElementById('brush-size').value;
+  const lc = layers[activeLayer];
+  const lctx = lc.ctx;
+  if (!smudgeData) smudgeData = lctx.getImageData(lastX-size/2, lastY-size/2, size, size);
+  lctx.save(); lctx.globalAlpha = 0.5;
+  lctx.putImageData(smudgeData, x-size/2, y-size/2);
+  lctx.restore();
+  smudgeData = lctx.getImageData(x-size/2, y-size/2, size, size);
+  renderLayers();
+}
+
+function paintClone(x,y) {
+  if (!cloneSource) return;
+  const size = +document.getElementById('brush-size').value;
+  const lc = layers[activeLayer]; const lctx = lc.ctx;
+  const dx = x - lastX, dy = y - lastY;
+  cloneSource.x += dx; cloneSource.y += dy;
+  const region = lctx.getImageData(cloneSource.x-size/2, cloneSource.y-size/2, size, size);
+  lctx.putImageData(region, x-size/2, y-size/2);
+  renderLayers();
+}
+
+// ============================================================
+// Fill
+// ============================================================
+function floodFill(startX, startY) {
+  const lc = layers[activeLayer]; const lctx = lc.ctx;
+  const id = lctx.getImageData(0,0,canvas.width,canvas.height);
+  const d = id.data;
+  const color = hexToRgb(document.getElementById('fg-color').value);
+  const si = (Math.round(startY)*canvas.width+Math.round(startX))*4;
+  const tr = d[si], tg = d[si+1], tb = d[si+2], ta = d[si+3];
+  if (tr===color.r&&tg===color.g&&tb===color.b) return;
+  const stack = [[Math.round(startX),Math.round(startY)]];
+  while(stack.length) {
+    const [x,y]=stack.pop();
+    if(x<0||x>=canvas.width||y<0||y>=canvas.height) continue;
+    const i=(y*canvas.width+x)*4;
+    if(Math.abs(d[i]-tr)>30||Math.abs(d[i+1]-tg)>30||Math.abs(d[i+2]-tb)>30) continue;
+    d[i]=color.r;d[i+1]=color.g;d[i+2]=color.b;d[i+3]=255;
+    stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
+  }
+  lctx.putImageData(id,0,0);
+  renderLayers(); pushUndo();
+}
+
+function hexToRgb(hex) {
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+
+// ============================================================
+// Eyedropper
+// ============================================================
+function pickColor(x,y) {
+  const id = ctx.getImageData(Math.round(x),Math.round(y),1,1).data;
+  const hex = '#'+[id[0],id[1],id[2]].map(v=>v.toString(16).padStart(2,'0')).join('');
+  document.getElementById('fg-color').value = hex;
+  document.getElementById('fg-swatch').style.background = hex;
+  document.getElementById('status-color').textContent = `rgb(${id[0]},${id[1]},${id[2]})`;
+}
+
+// ============================================================
+// Text tool
+// ============================================================
+function placeText(x,y) {
+  const wrap = document.getElementById('text-input-wrap');
+  const inp = document.getElementById('text-input');
+  const r = canvas.getBoundingClientRect();
+  wrap.style.left = (r.left + x*zoom) + 'px';
+  wrap.style.top = (r.top + y*zoom) + 'px';
+  wrap.style.display = 'block';
+  const sz = +document.getElementById('text-size').value;
+  const font = document.getElementById('text-font').value;
+  const bold = document.getElementById('text-bold-toggle').classList.contains('on') ? 'bold ' : '';
+  const italic = document.getElementById('text-italic-toggle').classList.contains('on') ? 'italic ' : '';
+  inp.style.font = `${italic}${bold}${sz}px ${font}`;
+  inp.style.color = document.getElementById('text-color').value;
+  inp.value=''; inp.focus();
+  inp.onkeydown = (ev) => {
+    if (ev.key==='Enter') commitText(x,y);
+    if (ev.key==='Escape') { wrap.style.display='none'; }
+  };
+}
+
+function commitText(x,y) {
+  const inp = document.getElementById('text-input');
+  const lc = layers[activeLayer]; const lctx = lc.ctx;
+  const sz = +document.getElementById('text-size').value;
+  const font = document.getElementById('text-font').value;
+  const bold = document.getElementById('text-bold-toggle').classList.contains('on') ? 'bold ' : '';
+  const italic = document.getElementById('text-italic-toggle').classList.contains('on') ? 'italic ' : '';
+  lctx.save();
+  lctx.font = `${italic}${bold}${sz}px ${font}`;
+  lctx.fillStyle = document.getElementById('text-color').value;
+  lctx.fillText(inp.value, x, y);
+  lctx.restore();
+  document.getElementById('text-input-wrap').style.display='none';
+  renderLayers(); pushUndo();
+}
+
+// ============================================================
+// Shapes
+// ============================================================
+function drawShapeOverlay(x,y) {
+  if (!shapeStart) return;
+  octx.clearRect(0,0,overlay.width,overlay.height);
+  drawShape(octx, shapeStart.x, shapeStart.y, x, y, true);
+}
+
+function commitShape(x,y) {
+  const lc = layers[activeLayer];
+  drawShape(lc.ctx, shapeStart.x, shapeStart.y, x, y, false);
+  octx.clearRect(0,0,overlay.width,overlay.height);
+  renderLayers(); pushUndo();
+}
+
+function drawShape(c, x1,y1,x2,y2, preview) {
+  const type = document.getElementById('shape-type').value;
+  const fill = document.getElementById('shape-fill-toggle').classList.contains('on');
+  const stroke = document.getElementById('shape-stroke-toggle').classList.contains('on');
+  const sw = +document.getElementById('stroke-width').value;
+  const color = document.getElementById('fg-color').value;
+  c.save();
+  c.strokeStyle = color; c.fillStyle = color;
+  c.lineWidth = sw;
+  if (preview) { c.globalAlpha=0.6; c.setLineDash([4,4]); }
+  const w=x2-x1, h=y2-y1;
+
+  if (type==='rect') { if(fill) c.fillRect(x1,y1,w,h); if(stroke) c.strokeRect(x1,y1,w,h); }
+  else if (type==='ellipse') {
+    c.beginPath(); c.ellipse(x1+w/2,y1+h/2,Math.abs(w/2),Math.abs(h/2),0,0,Math.PI*2);
+    if(fill) c.fill(); if(stroke) c.stroke();
+  }
+  else if (type==='line') { c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke(); }
+  else if (type==='arrow') {
+    c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+    const angle=Math.atan2(y2-y1,x2-x1);
+    const len=15;
+    c.beginPath(); c.moveTo(x2,y2);
+    c.lineTo(x2-len*Math.cos(angle-0.4),y2-len*Math.sin(angle-0.4));
+    c.lineTo(x2-len*Math.cos(angle+0.4),y2-len*Math.sin(angle+0.4));
+    c.closePath(); c.fill();
+  }
+  else if (type==='triangle') {
+    c.beginPath(); c.moveTo(x1+w/2,y1); c.lineTo(x2,y2); c.lineTo(x1,y2); c.closePath();
+    if(fill) c.fill(); if(stroke) c.stroke();
+  }
+  else if (type==='star') {
+    const cx=x1+w/2, cy=y1+h/2, r1=Math.min(Math.abs(w),Math.abs(h))/2, r2=r1*0.4;
+    c.beginPath();
+    for(let i=0;i<10;i++){
+      const a=Math.PI/5*i-Math.PI/2;
+      const r=i%2===0?r1:r2;
+      i===0?c.moveTo(cx+r*Math.cos(a),cy+r*Math.sin(a)):c.lineTo(cx+r*Math.cos(a),cy+r*Math.sin(a));
+    }
+    c.closePath(); if(fill) c.fill(); if(stroke) c.stroke();
+  }
+  c.restore();
+}
+
+// ============================================================
+// Crop
+// ============================================================
+function showCropUI() {
+  document.getElementById('btn-crop-apply').style.display='flex';
+  document.getElementById('btn-crop-cancel').style.display='flex';
+}
+function hideCropUI() {
+  document.getElementById('btn-crop-apply').style.display='none';
+  document.getElementById('btn-crop-cancel').style.display='none';
+  cropRect=null; octx.clearRect(0,0,overlay.width,overlay.height);
+}
+function drawCropOverlay(x,y) {
+  octx.clearRect(0,0,overlay.width,overlay.height);
+  if (!cropStart) return;
+  const x1=cropStart.x,y1=cropStart.y,w=x-x1,h=y-y1;
+  octx.save();
+  octx.fillStyle='rgba(0,0,0,0.5)';
+  octx.fillRect(0,0,overlay.width,overlay.height);
+  octx.clearRect(x1,y1,w,h);
+  octx.strokeStyle='#a855f7'; octx.lineWidth=1;
+  octx.strokeRect(x1,y1,w,h);
+  // Rule of thirds
+  octx.strokeStyle='rgba(168,85,247,0.3)';
+  for(let i=1;i<3;i++){
+    octx.beginPath();octx.moveTo(x1+w*i/3,y1);octx.lineTo(x1+w*i/3,y1+h);octx.stroke();
+    octx.beginPath();octx.moveTo(x1,y1+h*i/3);octx.lineTo(x1+w,y1+h*i/3);octx.stroke();
+  }
+  octx.restore();
+}
+document.getElementById('btn-crop-apply').addEventListener('click', () => {
+  if (!cropRect) return;
+  const {x1,y1,x2,y2}=cropRect;
+  const nx=Math.min(x1,x2),ny=Math.min(y1,y2),nw=Math.abs(x2-x1),nh=Math.abs(y2-y1);
+  if(nw<1||nh<1) return;
+  const tmp=document.createElement('canvas'); tmp.width=nw; tmp.height=nh;
+  tmp.getContext('2d').drawImage(canvas,nx,ny,nw,nh,0,0,nw,nh);
+  canvas.width=nw; canvas.height=nh;
+  overlay.width=nw; overlay.height=nh;
+  layers.forEach(l=>{
+    const tc=document.createElement('canvas'); tc.width=nw; tc.height=nh;
+    tc.getContext('2d').drawImage(l.canvas,nx,ny,nw,nh,0,0,nw,nh);
+    l.canvas=tc; l.ctx=tc.getContext('2d');
+  });
+  hideCropUI();
+  renderLayers(); pushUndo();
+  document.getElementById('status-size').textContent=`${nw}×${nh}`;
+});
+document.getElementById('btn-crop-cancel').addEventListener('click', hideCropUI);
+
+// ============================================================
+// Transform
+// ============================================================
+function rotateImage(deg) {
+  const w=canvas.width, h=canvas.height;
+  const rad=deg*Math.PI/180;
+  const nw=Math.round(Math.abs(w*Math.cos(rad))+Math.abs(h*Math.sin(rad)));
+  const nh=Math.round(Math.abs(w*Math.sin(rad))+Math.abs(h*Math.cos(rad)));
+  layers.forEach(l=>{
+    const tc=document.createElement('canvas'); tc.width=nw; tc.height=nh;
+    const tctx=tc.getContext('2d');
+    tctx.translate(nw/2,nh/2); tctx.rotate(rad); tctx.drawImage(l.canvas,-w/2,-h/2);
+    l.canvas=tc; l.ctx=tc.getContext('2d');
+  });
+  canvas.width=nw; canvas.height=nh; overlay.width=nw; overlay.height=nh;
+  renderLayers(); pushUndo();
+}
+
+function flipImage(dir) {
+  layers.forEach(l=>{
+    const tc=document.createElement('canvas'); tc.width=l.canvas.width; tc.height=l.canvas.height;
+    const tctx=tc.getContext('2d');
+    tctx.translate(dir==='h'?tc.width:0, dir==='v'?tc.height:0);
+    tctx.scale(dir==='h'?-1:1, dir==='v'?-1:1);
+    tctx.drawImage(l.canvas,0,0);
+    l.canvas=tc; l.ctx=tc.getContext('2d');
+  });
+  renderLayers(); pushUndo();
+}
+
+document.getElementById('rotation').addEventListener('input', function() {
+  document.getElementById('rotation-val').textContent = this.value+'°';
+});
+
+// ============================================================
+// Resize
+// ============================================================
+let aspectLock = true;
+document.getElementById('aspect-toggle').addEventListener('click', function() {
+  aspectLock=!aspectLock; this.classList.toggle('on',aspectLock);
+});
+document.getElementById('resize-w').addEventListener('input', function() {
+  if (aspectLock && canvas.width) document.getElementById('resize-h').value = Math.round(this.value * canvas.height / canvas.width);
+});
+document.getElementById('resize-h').addEventListener('input', function() {
+  if (aspectLock && canvas.height) document.getElementById('resize-w').value = Math.round(this.value * canvas.width / canvas.height);
+});
+function resizeCanvas() {
+  const nw=+document.getElementById('resize-w').value, nh=+document.getElementById('resize-h').value;
+  if(!nw||!nh) return;
+  layers.forEach(l=>{
+    const tc=document.createElement('canvas'); tc.width=nw; tc.height=nh;
+    tc.getContext('2d').drawImage(l.canvas,0,0,nw,nh);
+    l.canvas=tc; l.ctx=tc.getContext('2d');
+  });
+  canvas.width=nw; canvas.height=nh; overlay.width=nw; overlay.height=nh;
+  renderLayers(); pushUndo();
+  document.getElementById('status-size').textContent=`${nw}×${nh}`;
+}
+
+// ============================================================
+// Filters / Presets
+// ============================================================
+function applyPreset(name) {
+  resetAllAdj();
+  const presets = {
+    bw: {saturation:-100},
+    sepia: {saturation:-60,temperature:60,fade:20},
+    vivid: {saturation:60,contrast:30,clarity:40},
+    cool: {temperature:-50,tint:-10},
+    warm: {temperature:60,tint:10},
+    fade: {fade:40,contrast:-20,brightness:10},
+    chrome: {contrast:40,saturation:30,highlights:20,shadows:-20},
+    noir: {saturation:-100,contrast:60,vignette:60},
+    matte: {fade:30,blacks:20,shadows:20,contrast:-10},
+    vintage: {saturation:-20,temperature:40,fade:25,vignette:40},
+    dramatic: {contrast:60,clarity:60,shadows:-40,highlights:40,vignette:50},
+  };
+  const p = presets[name];
+  if (!p) return;
+  Object.entries(p).forEach(([k,v])=>{
+    adj[k]=v;
+    const el=document.getElementById(k==='blur'?'blur-adj':k);
+    if(el) el.value=v;
+  });
+  updateAllSliderLabels();
+  renderLayers();
+}
+
+// ============================================================
+// Layers
+// ============================================================
+function addLayer() {
+  const l = initLayer(`Layer ${layers.length+1}`);
+  layers.push(l); activeLayer=layers.length-1;
+  renderLayersList(); renderLayers();
+}
+
+function deleteLayer() {
+  if(layers.length===1) return;
+  layers.splice(activeLayer,1);
+  activeLayer=Math.min(activeLayer,layers.length-1);
+  renderLayersList(); renderLayers(); pushUndo();
+}
+
+function mergeDown() {
+  if(activeLayer===0) return;
+  const above=layers[activeLayer], below=layers[activeLayer-1];
+  below.ctx.save();
+  below.ctx.globalAlpha=above.opacity;
+  below.ctx.globalCompositeOperation=above.blend;
+  below.ctx.drawImage(above.canvas,0,0);
+  below.ctx.restore();
+  layers.splice(activeLayer,1); activeLayer--;
+  renderLayersList(); renderLayers(); pushUndo();
+}
+
+function renderLayersList() {
+  const list=document.getElementById('layers-list');
+  list.innerHTML='';
+  [...layers].reverse().forEach((l,ri)=>{
+    const i=layers.length-1-ri;
+    const div=document.createElement('div');
+    div.className='layer-item'+(i===activeLayer?' active':'');
+    const thumb=l.canvas.toDataURL('image/png',0.1);
+    div.innerHTML=`
+      <img class="layer-thumb" src="${thumb}">
+      <div class="layer-name">${l.name}</div>
+      <div class="layer-btns">
+        <button class="layer-btn" onclick="toggleLayerVis(${i})" title="Toggle"><i class="fa-solid fa-eye${l.visible?'':'-slash'}"></i></button>
+      </div>`;
+    div.addEventListener('click',()=>{activeLayer=i;renderLayersList();
+      document.getElementById('layer-opacity').value=l.opacity*100;
+      document.getElementById('layer-blend').value=l.blend;
+    });
+    list.appendChild(div);
+  });
+}
+
+function toggleLayerVis(i) {
+  layers[i].visible=!layers[i].visible; renderLayersList(); renderLayers();
+}
+
+document.getElementById('layer-opacity').addEventListener('input', function(){
+  document.getElementById('layer-opacity-val').textContent=this.value+'%';
+  layers[activeLayer].opacity=this.value/100; renderLayers();
+});
+document.getElementById('layer-blend').addEventListener('change', function(){
+  layers[activeLayer].blend=this.value; renderLayers();
+});
+
+// ============================================================
+// Adjustments sliders
+// ============================================================
+const adjSliders = [
+  ['brightness','brightness-val',''],
+  ['contrast','contrast-val',''],
+  ['saturation','saturation-val',''],
+  ['hue','hue-val','°'],
+  ['exposure','exposure-val',''],
+  ['highlights','highlights-val',''],
+  ['shadows','shadows-val',''],
+  ['whites','whites-val',''],
+  ['blacks','blacks-val',''],
+  ['sharpness','sharpness-val',''],
+  ['blur-adj','blur-val',''],
+  ['noise','noise-val',''],
+  ['vignette','vignette-val',''],
+  ['temperature','temperature-val',''],
+  ['tint','tint-val',''],
+  ['clarity','clarity-val',''],
+  ['vibrance','vibrance-val',''],
+  ['fade','fade-val',''],
+];
+
+adjSliders.forEach(([id,labelId,suffix])=>{
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('input',function(){
+    document.getElementById(labelId).textContent=this.value+suffix;
+    const key=id==='blur-adj'?'blur':id;
+    adj[key]=+this.value;
+    renderLayers();
+  });
+});
+
+function updateAllSliderLabels() {
+  adjSliders.forEach(([id,labelId,suffix])=>{
+    const el=document.getElementById(id);
+    if(el) document.getElementById(labelId).textContent=el.value+suffix;
+  });
+}
+
+// Brush sliders
+document.getElementById('brush-size').addEventListener('input',function(){document.getElementById('brush-size-val').textContent=this.value+'px';});
+document.getElementById('brush-opacity').addEventListener('input',function(){document.getElementById('brush-opacity-val').textContent=this.value+'%';});
+document.getElementById('brush-hardness').addEventListener('input',function(){document.getElementById('brush-hardness-val').textContent=this.value+'%';});
+document.getElementById('text-size').addEventListener('input',function(){document.getElementById('text-size-val').textContent=this.value+'px';});
+document.getElementById('stroke-width').addEventListener('input',function(){document.getElementById('stroke-width-val').textContent=this.value+'px';});
+document.getElementById('export-quality').addEventListener('input',function(){document.getElementById('quality-val').textContent=this.value+'%';});
+
+// Color pickers
+document.getElementById('fg-swatch').addEventListener('click',()=>document.getElementById('fg-color').click());
+document.getElementById('fg-color').addEventListener('input',function(){document.getElementById('fg-swatch').style.background=this.value;});
+document.getElementById('text-color-swatch').addEventListener('click',()=>document.getElementById('text-color').click());
+document.getElementById('text-color').addEventListener('input',function(){document.getElementById('text-color-swatch').style.background=this.value;});
+
+// Toggles
+document.querySelectorAll('.toggle').forEach(t=>{
+  t.addEventListener('click',function(){this.classList.toggle('on');});
+});
+
+// ============================================================
+// Undo / Redo
+// ============================================================
+function pushUndo() {
+  if (!imageLoaded) return;
+  const snapshot = layers.map(l=>({
+    name:l.name,opacity:l.opacity,blend:l.blend,visible:l.visible,
+    data:l.canvas.toDataURL()
+  }));
+  undoStack.push(snapshot);
+  if(undoStack.length>30) undoStack.shift();
+  redoStack=[];
+}
+
+function restoreSnapshot(snapshot) {
+  layers=[];
+  let loaded=0;
+  snapshot.forEach((s,i)=>{
+    const lc=document.createElement('canvas'); lc.width=canvas.width; lc.height=canvas.height;
+    const lctx=lc.ctx=lc.getContext('2d');
+    const img=new Image();
+    img.onload=()=>{
+      lctx.drawImage(img,0,0);
+      layers[i]={canvas:lc,ctx:lctx,name:s.name,opacity:s.opacity,blend:s.blend,visible:s.visible};
+      if(++loaded===snapshot.length){renderLayers();renderLayersList();}
+    };
+    img.src=s.data;
+  });
+}
+
+document.getElementById('btn-undo').addEventListener('click',()=>{
+  if(undoStack.length<2) return;
+  redoStack.push(undoStack.pop());
+  restoreSnapshot(undoStack[undoStack.length-1]);
+});
+document.getElementById('btn-redo').addEventListener('click',()=>{
+  if(!redoStack.length) return;
+  const s=redoStack.pop(); undoStack.push(s);
+  restoreSnapshot(s);
+});
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();document.getElementById('btn-undo').click();}
+  if((e.ctrlKey||e.metaKey)&&e.key==='y'){e.preventDefault();document.getElementById('btn-redo').click();}
+});
+
+// ============================================================
+// Zoom
+// ============================================================
+function setZoom(z) {
+  zoom=clamp(z,0.05,8);
+  const wrap=document.getElementById('canvas-wrap');
+  wrap.style.transform=`scale(${zoom})`;
+  wrap.style.transformOrigin='center center';
+  document.getElementById('zoom-display').textContent=Math.round(zoom*100)+'%';
+}
+function fitZoom() {
+  const area=document.getElementById('canvas-area');
+  const zw=(area.clientWidth-80)/canvas.width;
+  const zh=(area.clientHeight-80)/canvas.height;
+  setZoom(Math.min(zw,zh,1));
+}
+document.getElementById('btn-zoom-in').addEventListener('click',()=>setZoom(zoom*1.25));
+document.getElementById('btn-zoom-out').addEventListener('click',()=>setZoom(zoom*0.8));
+document.getElementById('btn-zoom-fit').addEventListener('click',fitZoom);
+document.getElementById('canvas-area').addEventListener('wheel',e=>{
+  e.preventDefault();
+  setZoom(zoom*(e.deltaY<0?1.1:0.9));
+},{passive:false});
+
+// ============================================================
+// Export
+// ============================================================
+function exportImage() {
+  const fmt=document.getElementById('export-format').value;
+  const q=+document.getElementById('export-quality').value/100;
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/'+fmt,q);
+  a.download='image.'+fmt;
+  a.click();
+}
+document.getElementById('btn-export').addEventListener('click',exportImage);
+
+// ============================================================
+// Helpers
+// ============================================================
+function rgbToHsl(r,g,b){
+  const max=Math.max(r,g,b),min=Math.min(r,g,b);
+  let h,s,l=(max+min)/2;
+  if(max===min){h=s=0;}else{
+    const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min);
+    switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}
+    h/=6;
+  }
+  return[h,s,l];
+}
+function hslToRgb(h,s,l){
+  if(s===0)return[l,l,l];
+  const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+  function hue(t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}
+  return[hue(h+1/3),hue(h),hue(h-1/3)];
+}
+
+function toggleSection(head) {
+  head.classList.toggle('collapsed');
+  const body=head.nextElementSibling;
+  body.style.display=head.classList.contains('collapsed')?'none':'block';
+}
+</script>
+</body>
+</html>
