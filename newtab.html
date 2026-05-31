@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Tab</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f11;
+    color: #e8e6e1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 48px;
+    padding: 2rem;
+  }
+
+  .clock {
+    text-align: center;
+    line-height: 1;
+  }
+
+  .time {
+    font-size: clamp(64px, 12vw, 120px);
+    font-weight: 200;
+    letter-spacing: -2px;
+    color: #f0ede8;
+  }
+
+  .date {
+    font-size: 15px;
+    color: #888;
+    margin-top: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .search-bar {
+    display: flex;
+    align-items: center;
+    background: #1a1a1f;
+    border: 1px solid #2a2a30;
+    border-radius: 14px;
+    padding: 0 18px;
+    width: min(520px, 90vw);
+    gap: 10px;
+    transition: border-color 0.15s;
+  }
+
+  .search-bar:focus-within {
+    border-color: #444;
+  }
+
+  .search-icon {
+    color: #555;
+    flex-shrink: 0;
+  }
+
+  .search-input {
+    background: none;
+    border: none;
+    outline: none;
+    color: #e8e6e1;
+    font-size: 16px;
+    padding: 14px 0;
+    width: 100%;
+    font-family: inherit;
+  }
+
+  .search-input::placeholder { color: #444; }
+
+  .links {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 520px;
+  }
+
+  .link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1a1a1f;
+    border: 1px solid #222228;
+    border-radius: 10px;
+    padding: 9px 16px;
+    text-decoration: none;
+    color: #aaa;
+    font-size: 13px;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+
+  .link:hover {
+    background: #222228;
+    color: #e8e6e1;
+    border-color: #333;
+  }
+
+  .favicon {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    object-fit: contain;
+    opacity: 0.7;
+  }
+
+  .link:hover .favicon { opacity: 1; }
+
+  .greeting {
+    font-size: 22px;
+    font-weight: 300;
+    color: #666;
+    letter-spacing: 0.01em;
+  }
+
+  @media (prefers-color-scheme: light) {
+    body { background: #f6f5f2; color: #1a1a1e; }
+    .time { color: #1a1a1e; }
+    .date { color: #999; }
+    .search-bar { background: #fff; border-color: #e0dedd; }
+    .search-bar:focus-within { border-color: #bbb; }
+    .search-icon { color: #bbb; }
+    .search-input { color: #1a1a1e; }
+    .search-input::placeholder { color: #bbb; }
+    .link { background: #fff; border-color: #e8e6e1; color: #888; }
+    .link:hover { background: #f0eee9; color: #1a1a1e; border-color: #ddd; }
+    .greeting { color: #bbb; }
+  }
+</style>
+</head>
+<body>
+
+<p class="greeting" id="greeting">Good morning</p>
+
+<div class="clock">
+  <div class="time" id="time">12:00</div>
+  <div class="date" id="date">Monday, January 1</div>
+</div>
+
+<form class="search-bar" action="https://www.google.com/search" method="get" target="_self">
+  <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+  <input class="search-input" name="q" placeholder="Search the web…" autocomplete="off" autofocus>
+</form>
+
+<nav class="links" id="links"></nav>
+
+<script>
+const LINKS = [
+  { label: 'GitHub', url: 'https://github.com', favicon: 'https://github.com/favicon.ico' },
+  { label: 'YouTube', url: 'https://youtube.com', favicon: 'https://youtube.com/favicon.ico' },
+  { label: 'Gmail', url: 'https://mail.google.com', favicon: 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico' },
+  { label: 'Reddit', url: 'https://reddit.com', favicon: 'https://reddit.com/favicon.ico' },
+  { label: 'Wikipedia', url: 'https://wikipedia.org', favicon: 'https://wikipedia.org/favicon.ico' },
+  { label: 'HN', url: 'https://news.ycombinator.com', favicon: 'https://news.ycombinator.com/favicon.ico' },
+];
+
+const linksEl = document.getElementById('links');
+LINKS.forEach(({ label, url, favicon }) => {
+  const a = document.createElement('a');
+  a.className = 'link';
+  a.href = url;
+  a.innerHTML = `<img class="favicon" src="${favicon}" alt="" onerror="this.style.display='none'">${label}`;
+  linksEl.appendChild(a);
+});
+
+function update() {
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('time').textContent = `${pad(h)}:${pad(m)}`;
+  document.getElementById('date').textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('greeting').textContent = greet;
+  const msToNext = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+  setTimeout(update, msToNext);
+}
+update();
+</script>
+</body>
+</html>
